@@ -24,11 +24,14 @@ import io.nekohasekai.sfa.utils.HookModuleUpdateNotifier
 import io.nekohasekai.sfa.utils.HookStatusClient
 import io.nekohasekai.sfa.utils.PrivilegeSettingsClient
 import io.nekohasekai.sfa.vendor.Vendor
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import io.nekohasekai.sfa.Application as BoxApplication
 
 class Application : Application() {
@@ -49,7 +52,6 @@ class Application : Application() {
         }
         HookStatusClient.register(this)
         PrivilegeSettingsClient.register(this)
-
         val baseDir = filesDir
         baseDir.mkdirs()
         val workingDir = getExternalFilesDir(null)
@@ -63,9 +65,13 @@ class Application : Application() {
 
         @Suppress("OPT_IN_USAGE")
         GlobalScope.launch(Dispatchers.IO) {
-            initialize(baseDir, workingDir, tempDir)
-            UpdateProfileWork.reconfigureUpdater()
-            HookModuleUpdateNotifier.sync(this@Application)
+            try {
+                initialize(baseDir, workingDir, tempDir)
+                UpdateProfileWork.reconfigureUpdater()
+                HookModuleUpdateNotifier.sync(this@Application)
+            } finally {
+                markLibboxReady()
+            }
         }
 
         if (Vendor.isPerAppProxyAvailable()) {
@@ -118,5 +124,25 @@ class Application : Application() {
         val notificationManager by lazy { application.getSystemService<NotificationManager>()!! }
         val wifiManager by lazy { application.getSystemService<WifiManager>()!! }
         val clipboard by lazy { application.getSystemService<ClipboardManager>()!! }
+
+        private val libboxReady = CompletableDeferred<Unit>()
+        private val libboxReadyFlag = AtomicBoolean(false)
+
+        fun markLibboxReady() {
+            if (libboxReadyFlag.compareAndSet(false, true)) {
+                libboxReady.complete(Unit)
+                Log.i("Application", "libbox ready")
+            }
+        }
+
+        /**
+         * 快捷方式冷启动时必须等待，否则 CommandServer 会因未 setup 而失败。
+         */
+        suspend fun awaitLibboxReady(timeoutMs: Long = 15_000L) {
+            if (libboxReadyFlag.get()) return
+            withTimeout(timeoutMs) {
+                libboxReady.await()
+            }
+        }
     }
 }

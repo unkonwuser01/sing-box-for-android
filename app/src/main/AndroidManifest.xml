@@ -114,7 +114,56 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
             </intent-filter>
 
+            <!-- 长按图标 / 三星日常「应用内操作」：开启、关闭、切换代理 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
+
+        <!-- App 图标长按、三星日常的代理控制入口。 -->
+        <activity
+            android:name=".custom.ProxyShortcutActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/shortcut_proxy_control"
+            android:theme="@style/AppTheme.Translucent" />
+
+        <!-- 三星日常等：按「活动名称」列出，点选即执行对应代理操作 -->
+        <activity-alias
+            android:name=".alias.ProxyStart"
+            android:exported="true"
+            android:icon="@drawable/ic_play_arrow_24"
+            android:label="@string/shortcut_proxy_start"
+            android:targetActivity=".custom.ProxyShortcutActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".alias.ProxyStop"
+            android:exported="true"
+            android:icon="@drawable/ic_stop_24"
+            android:label="@string/shortcut_proxy_stop"
+            android:targetActivity=".custom.ProxyShortcutActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".alias.ProxyToggle"
+            android:exported="true"
+            android:icon="@drawable/ic_electric_bolt_24"
+            android:label="@string/shortcut_proxy_toggle"
+            android:targetActivity=".custom.ProxyShortcutActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".bg.TileService"
             android:directBootAware="true"

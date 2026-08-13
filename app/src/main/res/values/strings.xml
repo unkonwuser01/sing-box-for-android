@@ -2,6 +2,15 @@
 <resources>
     <!-- App -->
     <string name="app_name" translatable="false">sing-box</string>
+    <!-- 三星日常 / Tasker：列表里显示的名称，点开即切换代理（非打开主界面） -->
+    <string name="shortcut_proxy_control" translatable="false">代理开关</string>
+    <string name="shortcut_proxy_start" translatable="false">开启代理</string>
+    <string name="shortcut_proxy_stop" translatable="false">关闭代理</string>
+    <string name="shortcut_proxy_toggle" translatable="false">切换代理</string>
+    <string name="shortcut_toast_started" translatable="false">代理已开启</string>
+    <string name="shortcut_toast_stopped" translatable="false">代理已关闭</string>
+    <string name="shortcut_toast_start_failed" translatable="false">开启失败：请先在 App 内选好配置并授权 VPN</string>
+    <string name="shortcut_toast_vpn_denied" translatable="false">未授予 VPN 权限</string>
     <string name="app_version_title">App version</string>
     <string name="language">Language</string>
     <string name="system_default">System default</string>
