@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import io.nekohasekai.sfa.Application
+import io.nekohasekai.sfa.BuildConfig
 import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.bg.BoxService
 import io.nekohasekai.sfa.database.Settings
@@ -111,8 +112,8 @@ class ProxyShortcutActivity : ComponentActivity() {
         when {
             intent.getStringExtra("proxy_command") == "start" -> Command.START
             intent.getStringExtra("proxy_command") == "stop" -> Command.STOP
-            intent.component?.className?.contains("ProxyStart") == true -> Command.START
-            intent.component?.className?.contains("ProxyStop") == true -> Command.STOP
+            intent.action == "${BuildConfig.APPLICATION_ID}.action.START" -> Command.START
+            intent.action == "${BuildConfig.APPLICATION_ID}.action.STOP" -> Command.STOP
             else -> Command.TOGGLE
         }
 
