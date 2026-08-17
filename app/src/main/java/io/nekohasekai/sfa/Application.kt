@@ -17,6 +17,7 @@ import io.nekohasekai.sfa.bg.AppChangeReceiver
 import io.nekohasekai.sfa.bg.CrashReportManager
 import io.nekohasekai.sfa.bg.OOMReportManager
 import io.nekohasekai.sfa.bg.UpdateProfileWork
+import io.nekohasekai.sfa.compose.screen.tools.TaildropFiles
 import io.nekohasekai.sfa.constant.Bugs
 import io.nekohasekai.sfa.custom.ProxyShortcuts
 import io.nekohasekai.sfa.database.Settings
@@ -71,6 +72,7 @@ class Application : Application() {
                 initialize(baseDir, workingDir, tempDir)
                 UpdateProfileWork.reconfigureUpdater()
                 HookModuleUpdateNotifier.sync(this@Application)
+                TaildropFiles.cleanCache()
             } finally {
                 markLibboxReady()
             }

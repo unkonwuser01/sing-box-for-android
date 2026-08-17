@@ -10,7 +10,6 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import io.nekohasekai.sfa.compose.screen.configuration.NewProfileScreen
@@ -54,6 +53,8 @@ import io.nekohasekai.sfa.compose.screen.tools.OpenVPNEndpointScreen
 import io.nekohasekai.sfa.compose.screen.tools.OpenVPNStatusViewModel
 import io.nekohasekai.sfa.compose.screen.tools.OutboundPickerScreen
 import io.nekohasekai.sfa.compose.screen.tools.STUNTestScreen
+import io.nekohasekai.sfa.compose.screen.tools.TaildropInboxScreen
+import io.nekohasekai.sfa.compose.screen.tools.TaildropViewModel
 import io.nekohasekai.sfa.compose.screen.tools.TailscaleEndpointScreen
 import io.nekohasekai.sfa.compose.screen.tools.TailscaleExitNodePickerScreen
 import io.nekohasekai.sfa.compose.screen.tools.TailscalePeerScreen
@@ -84,7 +85,7 @@ private val slideOutToLeft: AnimatedContentTransitionScope<*>.() -> androidx.com
 }
 
 @Composable
-fun SFANavHost(
+fun NavHost(
     navController: NavHostController,
     serviceStatus: Status = Status.Stopped,
     showStartFab: Boolean = false,
@@ -103,7 +104,7 @@ fun SFANavHost(
     openVPNStatusViewModel: OpenVPNStatusViewModel? = null,
     modifier: Modifier = Modifier,
 ) {
-    NavHost(
+    androidx.navigation.compose.NavHost(
         navController = navController,
         startDestination = Screen.Dashboard.route,
         modifier = modifier,
@@ -253,7 +254,7 @@ fun SFANavHost(
             val usbIPViewModel: USBIPStatusViewModel = usbIPStatusViewModel ?: viewModel()
             val openConnectViewModel: OpenConnectStatusViewModel = openConnectStatusViewModel ?: viewModel()
             val openVPNViewModel: OpenVPNStatusViewModel = openVPNStatusViewModel ?: viewModel()
-            ToolsScreen(navController = navController, serviceStatus = serviceStatus, tailscaleViewModel = tailscaleViewModel, sshSharedViewModel = sshSharedViewModel, usbIPViewModel = usbIPViewModel, openConnectViewModel = openConnectViewModel, openVPNViewModel = openVPNViewModel)
+            ToolsScreen(navController = navController, tailscaleViewModel = tailscaleViewModel, sshSharedViewModel = sshSharedViewModel, usbIPViewModel = usbIPViewModel, openConnectViewModel = openConnectViewModel, openVPNViewModel = openVPNViewModel)
         }
 
         // Tools subscreens with slide animations
@@ -357,6 +358,23 @@ fun SFANavHost(
             val tailscaleViewModel: TailscaleStatusViewModel = tailscaleStatusViewModel ?: viewModel()
             val sshSharedViewModel: TailscaleSSHSharedViewModel = tailscaleSSHSharedViewModel ?: viewModel()
             TailscaleEndpointScreen(navController = navController, viewModel = tailscaleViewModel, sshSharedViewModel = sshSharedViewModel, endpointTag = endpointTag)
+        }
+
+        composable(
+            route = "tools/tailscale/{endpointTag}/taildrop",
+            arguments = listOf(navArgument("endpointTag") { type = NavType.StringType }),
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight,
+        ) { backStackEntry ->
+            val endpointTag = Uri.decode(backStackEntry.arguments?.getString("endpointTag") ?: return@composable)
+            val taildropViewModel: TaildropViewModel = viewModel()
+            TaildropInboxScreen(
+                navController = navController,
+                viewModel = taildropViewModel,
+                endpointTag = endpointTag,
+            )
         }
 
         composable(

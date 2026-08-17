@@ -53,7 +53,6 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -103,12 +102,13 @@ import io.nekohasekai.sfa.compose.base.SelectableMessageDialog
 import io.nekohasekai.sfa.compose.base.UiEvent
 import io.nekohasekai.sfa.compose.component.RemoteStatusBar
 import io.nekohasekai.sfa.compose.component.ServiceStatusBar
+import io.nekohasekai.sfa.compose.component.SnackbarHost
 import io.nekohasekai.sfa.compose.component.UpdateAvailableDialog
 import io.nekohasekai.sfa.compose.component.UptimeText
 import io.nekohasekai.sfa.compose.model.Connection
+import io.nekohasekai.sfa.compose.navigation.NavHost
 import io.nekohasekai.sfa.compose.navigation.NewProfileArgs
 import io.nekohasekai.sfa.compose.navigation.ProfileRoutes
-import io.nekohasekai.sfa.compose.navigation.SFANavHost
 import io.nekohasekai.sfa.compose.navigation.Screen
 import io.nekohasekai.sfa.compose.navigation.bottomNavigationScreens
 import io.nekohasekai.sfa.compose.screen.configuration.ProfileImportHandler
@@ -121,10 +121,11 @@ import io.nekohasekai.sfa.compose.screen.dashboard.groups.GroupsViewModel
 import io.nekohasekai.sfa.compose.screen.log.LogViewModel
 import io.nekohasekai.sfa.compose.screen.tools.OpenConnectStatusViewModel
 import io.nekohasekai.sfa.compose.screen.tools.OpenVPNStatusViewModel
+import io.nekohasekai.sfa.compose.screen.tools.TaildropSendManager
 import io.nekohasekai.sfa.compose.screen.tools.TailscaleSSHSharedViewModel
 import io.nekohasekai.sfa.compose.screen.tools.TailscaleStatusViewModel
 import io.nekohasekai.sfa.compose.screen.usbip.USBIPStatusViewModel
-import io.nekohasekai.sfa.compose.theme.SFATheme
+import io.nekohasekai.sfa.compose.theme.Theme
 import io.nekohasekai.sfa.compose.topbar.LocalTopBarController
 import io.nekohasekai.sfa.compose.topbar.TopBarController
 import io.nekohasekai.sfa.compose.topbar.TopBarEntry
@@ -236,8 +237,8 @@ class MainActivity :
         handleIntent(intent)
 
         setContent {
-            SFATheme {
-                SFAApp()
+            Theme {
+                App()
             }
         }
     }
@@ -255,6 +256,16 @@ class MainActivity :
             pendingNavigationRoute.value = "settings/privilege"
         }
         val uri = intent.data ?: return
+        if (uri.scheme == "sing-box") {
+            val target = if (uri.isOpaque) Uri.parse("sing-box://" + uri.schemeSpecificPart) else uri
+            if (target.host == "taildrop") {
+                val endpointTag = target.getQueryParameter("endpoint")
+                if (!endpointTag.isNullOrEmpty()) {
+                    pendingNavigationRoute.value = "tools/tailscale/${Uri.encode(endpointTag)}/taildrop"
+                }
+                return
+            }
+        }
         if (intent.action == Action.OPEN_URL) {
             launchCustomTab(uri.toString())
             return
@@ -359,7 +370,7 @@ class MainActivity :
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun SFAApp() {
+    fun App() {
         val navController = rememberNavController()
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
@@ -839,12 +850,12 @@ class MainActivity :
         val tailscaleSSHSharedViewModel: TailscaleSSHSharedViewModel = viewModel()
 
         val isToolsRoute = currentRootRoute == Screen.Tools.route
-        val tailscaleStatusViewModel: TailscaleStatusViewModel? =
-            if (isToolsRoute) {
-                viewModel()
-            } else {
-                null
-            }
+
+        val tailscaleStatusViewModel: TailscaleStatusViewModel = viewModel()
+        val tailscaleState by tailscaleStatusViewModel.uiState.collectAsState()
+        val taildropUnreadCount = tailscaleState.endpoints.sumOf { it.unreadFileCount }
+        val taildropSendSessions by TaildropSendManager.sessions.collectAsState()
+        val taildropFailedCount = taildropSendSessions.count { it.errorMessage != null }
 
         val usbIPStatusViewModel: USBIPStatusViewModel? =
             if (isToolsRoute) {
@@ -867,6 +878,37 @@ class MainActivity :
                 null
             }
 
+        val statusTargetActive = remoteServer != null || currentServiceStatus == Status.Started
+        val subscribeStatus = {
+            tailscaleStatusViewModel.subscribe()
+            usbIPStatusViewModel?.subscribe()
+            openConnectStatusViewModel?.subscribe()
+            openVPNStatusViewModel?.subscribe()
+        }
+        val cancelStatus = {
+            tailscaleStatusViewModel.cancel()
+            usbIPStatusViewModel?.cancel()
+            openConnectStatusViewModel?.cancel()
+            openVPNStatusViewModel?.cancel()
+        }
+        LaunchedEffect(remoteServer?.id) {
+            cancelStatus()
+            if (statusTargetActive) {
+                subscribeStatus()
+            }
+        }
+        LaunchedEffect(
+            statusTargetActive,
+            usbIPStatusViewModel,
+            openConnectStatusViewModel,
+            openVPNStatusViewModel,
+        ) {
+            if (statusTargetActive) {
+                subscribeStatus()
+            } else {
+                cancelStatus()
+            }
+        }
         val showGroupsInNav = dashboardUiState.hasGroups
         val showConnectionsInNav =
             if (isRemote) {
@@ -980,7 +1022,7 @@ class MainActivity :
                 val showStatusBar = isRemote || serviceRunning || currentServiceStatus == Status.Stopping
                 val showStartFab = !isRemote && !serviceRunning && dashboardUiState.selectedProfileId != -1L
 
-                SFANavHost(
+                NavHost(
                     navController = navController,
                     serviceStatus = currentServiceStatus,
                     showStartFab = showStartFab,
@@ -1175,7 +1217,8 @@ class MainActivity :
         val crashReportUnreadCount by CrashReportManager.unreadCount.collectAsState()
         val oomReportUnreadCount by OOMReportManager.unreadCount.collectAsState()
         // The crash/OOM report entries are hidden in remote control mode.
-        val toolsUnreadCount = if (isRemote) 0 else crashReportUnreadCount + oomReportUnreadCount
+        val toolsUnreadCount =
+            (if (isRemote) 0 else crashReportUnreadCount + oomReportUnreadCount) + taildropUnreadCount
 
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
@@ -1199,6 +1242,10 @@ class MainActivity :
                                     icon = {
                                         if (screen == Screen.Settings && hasUpdate) {
                                             BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.primary) }) {
+                                                Icon(screen.icon, contentDescription = null)
+                                            }
+                                        } else if (screen == Screen.Tools && taildropFailedCount > 0) {
+                                            BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) { Text("!") } }) {
                                                 Icon(screen.icon, contentDescription = null)
                                             }
                                         } else if (screen == Screen.Tools && toolsUnreadCount > 0) {
@@ -1249,6 +1296,10 @@ class MainActivity :
                                                 BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.primary) }) {
                                                     Icon(screen.icon, contentDescription = null)
                                                 }
+                                            } else if (screen == Screen.Tools && taildropFailedCount > 0) {
+                                                BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) { Text("!") } }) {
+                                                    Icon(screen.icon, contentDescription = null)
+                                                }
                                             } else if (screen == Screen.Tools && toolsUnreadCount > 0) {
                                                 BadgedBox(badge = { Badge(containerColor = MaterialTheme.colorScheme.error) { Text("$toolsUnreadCount") } }) {
                                                     Icon(screen.icon, contentDescription = null)
@@ -1283,6 +1334,18 @@ class MainActivity :
                 ) { paddingValues ->
                     scaffoldContent(paddingValues)
                 }
+            }
+        }
+
+        LaunchedEffect(dashboardUiState.hasGroups) {
+            if (!dashboardUiState.hasGroups) {
+                showGroupsSheet = false
+            }
+        }
+        val connectionsAvailable = if (isRemote) remoteConnected else currentServiceStatus == Status.Started
+        LaunchedEffect(connectionsAvailable) {
+            if (!connectionsAvailable) {
+                showConnectionsSheet = false
             }
         }
 
