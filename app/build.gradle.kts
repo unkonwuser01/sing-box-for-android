@@ -3,6 +3,7 @@ import org.gradle.api.tasks.Sync
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.FileInputStream
 import java.util.Base64
 import java.util.Properties
@@ -38,6 +39,19 @@ fun getProps(propName: String): String {
         }
     }
     return ""
+}
+
+fun resolveKeystore(): File {
+    val fromProps = getProps("KEYSTORE_FILE")
+    if (fromProps.isNotEmpty()) {
+        val configured = File(fromProps)
+        return if (configured.isAbsolute) configured else rootProject.file(fromProps)
+    }
+    val workspaceKeystore = rootProject.file("../release.keystore")
+    if (workspaceKeystore.isFile) {
+        return workspaceKeystore
+    }
+    return file("release.keystore")
 }
 
 fun getVersionProps(propName: String): String {
@@ -78,7 +92,8 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("release.keystore")
+            // 证书放在工作区根目录，避免 Android 仓 merge 时被 git 删掉。
+            storeFile = resolveKeystore()
             storePassword = getProps("KEYSTORE_PASS")
             keyAlias = getProps("ALIAS_NAME")
             keyPassword = getProps("ALIAS_PASS")
