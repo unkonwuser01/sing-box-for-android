@@ -36,6 +36,7 @@ import io.nekohasekai.sfa.compose.screen.settings.RemoteControlScreen
 import io.nekohasekai.sfa.compose.screen.settings.ServiceSettingsScreen
 import io.nekohasekai.sfa.compose.screen.settings.SettingsScreen
 import io.nekohasekai.sfa.compose.screen.settings.TailscaleFontPickerScreen
+import io.nekohasekai.sfa.compose.screen.settings.TailscaleGhosttyConfigEditorScreen
 import io.nekohasekai.sfa.compose.screen.settings.TailscaleTerminalConfigScreen
 import io.nekohasekai.sfa.compose.screen.settings.TailscaleThemePickerScreen
 import io.nekohasekai.sfa.compose.screen.tools.CrashReportDetailScreen
@@ -52,6 +53,10 @@ import io.nekohasekai.sfa.compose.screen.tools.OpenConnectStatusViewModel
 import io.nekohasekai.sfa.compose.screen.tools.OpenVPNEndpointScreen
 import io.nekohasekai.sfa.compose.screen.tools.OpenVPNStatusViewModel
 import io.nekohasekai.sfa.compose.screen.tools.OutboundPickerScreen
+import io.nekohasekai.sfa.compose.screen.tools.PowerReportDetailScreen
+import io.nekohasekai.sfa.compose.screen.tools.PowerReportFileContentScreen
+import io.nekohasekai.sfa.compose.screen.tools.PowerReportListScreen
+import io.nekohasekai.sfa.compose.screen.tools.PowerReportMetadataScreen
 import io.nekohasekai.sfa.compose.screen.tools.STUNTestScreen
 import io.nekohasekai.sfa.compose.screen.tools.TaildropInboxScreen
 import io.nekohasekai.sfa.compose.screen.tools.TaildropViewModel
@@ -254,7 +259,7 @@ fun NavHost(
             val usbIPViewModel: USBIPStatusViewModel = usbIPStatusViewModel ?: viewModel()
             val openConnectViewModel: OpenConnectStatusViewModel = openConnectStatusViewModel ?: viewModel()
             val openVPNViewModel: OpenVPNStatusViewModel = openVPNStatusViewModel ?: viewModel()
-            ToolsScreen(navController = navController, tailscaleViewModel = tailscaleViewModel, sshSharedViewModel = sshSharedViewModel, usbIPViewModel = usbIPViewModel, openConnectViewModel = openConnectViewModel, openVPNViewModel = openVPNViewModel)
+            ToolsScreen(navController = navController, tailscaleViewModel = tailscaleViewModel, sshSharedViewModel = sshSharedViewModel, usbIPViewModel = usbIPViewModel, openConnectViewModel = openConnectViewModel, openVPNViewModel = openVPNViewModel, showStatusBar = showStatusBar)
         }
 
         // Tools subscreens with slide animations
@@ -551,6 +556,56 @@ fun NavHost(
             OOMReportFileContentScreen(navController = navController, reportId = reportId, fileKind = fileKind)
         }
 
+        composable(
+            route = "tools/power_report",
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight,
+        ) {
+            PowerReportListScreen(navController = navController, serviceStatus = serviceStatus)
+        }
+
+        composable(
+            route = "tools/power_report/{reportId}",
+            arguments = listOf(navArgument("reportId") { type = NavType.StringType }),
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight,
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getString("reportId") ?: return@composable
+            PowerReportDetailScreen(navController = navController, reportId = reportId)
+        }
+
+        composable(
+            route = "tools/power_report/{reportId}/metadata",
+            arguments = listOf(navArgument("reportId") { type = NavType.StringType }),
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight,
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getString("reportId") ?: return@composable
+            PowerReportMetadataScreen(navController = navController, reportId = reportId)
+        }
+
+        composable(
+            route = "tools/power_report/{reportId}/file/{fileKind}",
+            arguments = listOf(
+                navArgument("reportId") { type = NavType.StringType },
+                navArgument("fileKind") { type = NavType.StringType },
+            ),
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight,
+        ) { backStackEntry ->
+            val reportId = backStackEntry.arguments?.getString("reportId") ?: return@composable
+            val fileKind = backStackEntry.arguments?.getString("fileKind") ?: return@composable
+            PowerReportFileContentScreen(navController = navController, reportId = reportId, fileKind = fileKind)
+        }
+
         composable(Screen.Settings.route) {
             SettingsScreen(navController = navController)
         }
@@ -688,6 +743,18 @@ fun NavHost(
         ) { backStackEntry ->
             val isDarkStr = backStackEntry.arguments?.getString("isDark") ?: "false"
             TailscaleThemePickerScreen(navController = navController, isDark = isDarkStr == "true")
+        }
+
+        composable(
+            route = "settings/tailscale/config_editor/{isDark}",
+            arguments = listOf(navArgument("isDark") { type = NavType.StringType }),
+            enterTransition = slideInFromRight,
+            exitTransition = slideOutToLeft,
+            popEnterTransition = slideInFromLeft,
+            popExitTransition = slideOutToRight,
+        ) { backStackEntry ->
+            val isDarkStr = backStackEntry.arguments?.getString("isDark") ?: "false"
+            TailscaleGhosttyConfigEditorScreen(navController = navController, isDark = isDarkStr == "true")
         }
 
         composable(

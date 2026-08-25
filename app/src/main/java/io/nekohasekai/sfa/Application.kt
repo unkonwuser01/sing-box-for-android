@@ -16,6 +16,7 @@ import io.nekohasekai.libbox.SetupOptions
 import io.nekohasekai.sfa.bg.AppChangeReceiver
 import io.nekohasekai.sfa.bg.CrashReportManager
 import io.nekohasekai.sfa.bg.OOMReportManager
+import io.nekohasekai.sfa.bg.PowerReportManager
 import io.nekohasekai.sfa.bg.UpdateProfileWork
 import io.nekohasekai.sfa.compose.screen.tools.TaildropFiles
 import io.nekohasekai.sfa.constant.Bugs
@@ -64,6 +65,7 @@ class Application : Application() {
             workingDir.mkdirs()
             CrashReportManager.install(workingDir, baseDir)
             OOMReportManager.install(workingDir)
+            PowerReportManager.install(workingDir)
         }
 
         @Suppress("OPT_IN_USAGE")
@@ -117,6 +119,7 @@ class Application : Application() {
         it.oomKillerEnabled = Settings.oomKillerEnabled
         it.oomKillerDisabled = Settings.oomKillerDisabled
         it.oomMemoryLimit = Settings.oomMemoryLimitMB.toLong() * 1024L * 1024L
+        it.powerReportEnabled = Settings.powerReportEnabled
     }
 
     companion object {
