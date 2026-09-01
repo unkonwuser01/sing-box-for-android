@@ -370,7 +370,7 @@ dependencies {
     implementation("org.kodein.emoji:emoji-kt:2.5.0")
 
     // Terminal emulator
-    val libghosttyVersion = "0.1.0-SNAPSHOT"
+    val libghosttyVersion = "0.1.0-alpha01"
     implementation("io.github.sagernet:libghostty-android:$libghosttyVersion")
     implementation("io.github.sagernet:libghostty-android-extras:$libghosttyVersion")
     "playImplementation"("io.github.sagernet:libghostty-android-compose:$libghosttyVersion")
@@ -380,11 +380,6 @@ dependencies {
     // Xposed API for self-hooking VPN hide module
     compileOnly("de.robv.android.xposed:api:82")
     compileOnly(project(":libxposed-api"))
-}
-
-// For libghostty-android snapshots; remove after release.
-configurations.configureEach {
-    resolutionStrategy.cacheChangingModulesFor(0, "seconds")
 }
 
 val playCredentialsJSON = rootProject.file("service-account-credentials.json")
