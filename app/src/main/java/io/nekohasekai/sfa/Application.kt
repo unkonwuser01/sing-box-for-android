@@ -27,9 +27,11 @@ import io.nekohasekai.sfa.utils.HookModuleUpdateNotifier
 import io.nekohasekai.sfa.utils.HookStatusClient
 import io.nekohasekai.sfa.utils.PrivilegeSettingsClient
 import io.nekohasekai.sfa.vendor.Vendor
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
@@ -66,10 +68,16 @@ class Application : Application() {
 
         @Suppress("OPT_IN_USAGE")
         GlobalScope.launch(Dispatchers.IO) {
-            Settings.dataStore.initialize()
-            HookStatusClient.register(this@Application)
-            PrivilegeSettingsClient.register(this@Application)
-            initialize(baseDir, workingDir, tempDir)
+            try {
+                Settings.dataStore.initialize()
+                HookStatusClient.register(this@Application)
+                PrivilegeSettingsClient.register(this@Application)
+                initialize(baseDir, workingDir, tempDir)
+                libboxReady.complete(Unit)
+            } catch (exception: Throwable) {
+                libboxReady.completeExceptionally(exception)
+                throw exception
+            }
             UpdateProfileWork.reconfigureUpdater()
             HookModuleUpdateNotifier.sync(this@Application)
             TaildropFiles.cleanCache()
@@ -134,5 +142,13 @@ class Application : Application() {
         val notificationManager by lazy { application.getSystemService<NotificationManager>()!! }
         val wifiManager by lazy { application.getSystemService<WifiManager>()!! }
         val clipboard by lazy { application.getSystemService<ClipboardManager>()!! }
+
+        private val libboxReady = CompletableDeferred<Unit>()
+
+        suspend fun awaitLibboxReady(timeoutMs: Long = 15_000L) {
+            withTimeout(timeoutMs) {
+                libboxReady.await()
+            }
+        }
     }
 }
