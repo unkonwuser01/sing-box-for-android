@@ -4,6 +4,8 @@ import androidx.lifecycle.viewModelScope
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.OutboundGroup
 import io.nekohasekai.libbox.StatusMessage
+import io.nekohasekai.sfa.Application
+import io.nekohasekai.sfa.R
 import io.nekohasekai.sfa.bg.BoxService
 import io.nekohasekai.sfa.compose.base.BaseViewModel
 import io.nekohasekai.sfa.compose.base.UiEvent
@@ -277,26 +279,7 @@ class DashboardViewModel :
                 val profile = ProfileManager.get(profileId) ?: return@launch
 
                 Settings.selectedProfile = profileId
-
-                // Check if service is running
-                if (_serviceStatus.value == Status.Started) {
-                    val restart = Settings.rebuildServiceMode()
-                    if (restart) {
-                        // Need full restart
-                        BoxService.stop()
-                        sendGlobalEvent(UiEvent.RequestReconnectService)
-                        for (i in 0 until 30) {
-                            if (_serviceStatus.value == Status.Stopped) {
-                                break
-                            }
-                            delay(100L)
-                        }
-                        sendGlobalEvent(UiEvent.RequestStartService)
-                    } else {
-                        // Just reload
-                        Libbox.newStandaloneCommandClient().serviceReload()
-                    }
-                }
+                applySelectedProfile()
 
                 withContext(Dispatchers.Main) {
                     loadProfiles()
@@ -307,6 +290,22 @@ class DashboardViewModel :
                 updateState { copy(isLoading = false) }
             }
         }
+    }
+
+    private suspend fun applySelectedProfile() {
+        if (_serviceStatus.value != Status.Started) return
+        if (Settings.detectServiceMode() == Settings.serviceMode) {
+            Libbox.newStandaloneCommandClient().serviceReload()
+            return
+        }
+        BoxService.stop()
+        for (i in 0 until 30) {
+            if (_serviceStatus.value == Status.Stopped) {
+                break
+            }
+            delay(100L)
+        }
+        sendGlobalEvent(UiEvent.RequestStartService)
     }
 
     fun editProfile(profile: Profile) {
@@ -369,6 +368,14 @@ class DashboardViewModel :
                 profile.typed.lastUpdated = Date()
                 ProfileManager.update(profile)
 
+                if (contentChanged && profile.id == Settings.selectedProfile) {
+                    try {
+                        applySelectedProfile()
+                    } catch (e: Exception) {
+                        sendError(e)
+                    }
+                }
+
                 // Reload profiles
                 loadProfiles()
 
@@ -382,15 +389,8 @@ class DashboardViewModel :
                     delay(1500)
                     updateState { copy(updatedProfileId = null) }
                 }
-
-                // Restart service if this is the selected profile and content changed
-                if (contentChanged && profile.id == Settings.selectedProfile) {
-                    withContext(Dispatchers.Main) {
-                        sendGlobalEvent(UiEvent.RequestReconnectService)
-                    }
-                }
             } catch (e: Exception) {
-                sendErrorMessage("Failed to update profile: ${e.message}")
+                sendErrorMessage(Application.application.getString(R.string.failed_update_profile, e.message))
                 // Clear updating state on error
                 withContext(Dispatchers.Main) {
                     updateState { copy(updatingProfileId = null) }

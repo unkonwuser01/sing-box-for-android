@@ -31,6 +31,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.io.File
@@ -38,6 +40,10 @@ import java.util.Locale
 import io.nekohasekai.sfa.Application as BoxApplication
 
 class Application : Application() {
+    private val setupAccess = Mutex()
+    private var workingDir: File? = null
+    private var setupCompleted = false
+
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
         application = this
@@ -54,17 +60,9 @@ class Application : Application() {
             Log.d("Application", "set locale: ${it.message}")
         }
 
-        val baseDir = filesDir
-        baseDir.mkdirs()
-        val workingDir = getExternalFilesDir(null)
-        val tempDir = cacheDir
-        tempDir.mkdirs()
-        if (workingDir != null) {
-            workingDir.mkdirs()
-            CrashReportManager.install(workingDir, baseDir)
-            OOMReportManager.install(workingDir)
-            PowerReportManager.install(workingDir)
-        }
+        filesDir.mkdirs()
+        cacheDir.mkdirs()
+        installWorkingDir()
 
         @Suppress("OPT_IN_USAGE")
         GlobalScope.launch(Dispatchers.IO) {
@@ -72,8 +70,14 @@ class Application : Application() {
                 Settings.dataStore.initialize()
                 HookStatusClient.register(this@Application)
                 PrivilegeSettingsClient.register(this@Application)
-                initialize(baseDir, workingDir, tempDir)
-                libboxReady.complete(Unit)
+                runCatching {
+                    setupLibbox()
+                }.onSuccess {
+                    libboxReady.complete(Unit)
+                }.onFailure {
+                    libboxReady.completeExceptionally(it)
+                    Log.w("Application", "setup libbox: ${it.message}")
+                }
             } catch (exception: Throwable) {
                 libboxReady.completeExceptionally(exception)
                 throw exception
@@ -95,20 +99,27 @@ class Application : Application() {
         }
     }
 
-    private fun initialize(baseDir: File, workingDir: File?, tempDir: File) {
-        val actualWorkingDir = workingDir ?: return
-        setupLibbox(baseDir, actualWorkingDir, tempDir)
+    private fun installWorkingDir(): File? {
+        workingDir?.let { return it }
+        val dir = getExternalFilesDir(null) ?: return null
+        dir.mkdirs()
+        CrashReportManager.install(dir, filesDir)
+        OOMReportManager.install(dir)
+        PowerReportManager.install(dir)
+        workingDir = dir
+        return dir
+    }
+
+    suspend fun setupLibbox() = setupAccess.withLock {
+        if (setupCompleted) return@withLock
+        val dir = installWorkingDir() ?: error("android: external storage unavailable")
+        Libbox.setup(createSetupOptions(filesDir, dir, cacheDir))
+        setupCompleted = true
     }
 
     fun reloadSetupOptions() {
-        val baseDir = filesDir
-        val workingDir = getExternalFilesDir(null) ?: return
-        val tempDir = cacheDir
-        Libbox.reloadSetupOptions(createSetupOptions(baseDir, workingDir, tempDir))
-    }
-
-    private fun setupLibbox(baseDir: File, workingDir: File, tempDir: File) {
-        Libbox.setup(createSetupOptions(baseDir, workingDir, tempDir))
+        val dir = getExternalFilesDir(null) ?: return
+        Libbox.reloadSetupOptions(createSetupOptions(filesDir, dir, cacheDir))
     }
 
     private fun createSetupOptions(baseDir: File, workingDir: File, tempDir: File): SetupOptions = SetupOptions().also {
